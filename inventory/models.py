@@ -1,5 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from rest_framework.exceptions import ValidationError
 
 
 class Inventory(models.Model):
@@ -18,12 +19,9 @@ class Inventory(models.Model):
         return self.product_name
 
     @classmethod
-    def optimistic_lock(cls, inventory_id, last_updated_at):
-        try:
-            inventory = cls.objects.get(id=inventory_id)
-            # 클라이언트가 가진 버전과 DB의 버전이 다르면 충돌이 발생한 것으로 간주
-            if inventory.updated_at != last_updated_at:
-                raise ObjectDoesNotExist('동시성 문제로 인한 충돌 발생')
-            return inventory
-        except cls.DoesNotExist:
-            raise ObjectDoesNotExist('해당 제품이 존재하지 않습니다.')
+    def optimistic_lock(cls, inventory_id, updated_at):
+        inventory = cls.objects.get(id=inventory_id)
+        # 업데이트 하고자 하는 데이터의 updated_at이 현재 데이터의 updated_at보다 작다면 다른 사용자가 수정한 것이므로 에러 발생
+        if inventory.updated_at > updated_at:
+            raise ValidationError('이미 다른 사용자가 수정했습니다. 다시 시도해주세요')
+        return inventory
